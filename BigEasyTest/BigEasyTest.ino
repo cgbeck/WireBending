@@ -9,15 +9,16 @@
 
 #include <AccelStepper.h>
 
-AccelStepper stepper(1,2,3); // Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 5
+AccelStepper stepper(1,8,9); // Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 5
 
 void setup()
 {  
    stepper.setMaxSpeed(1000);
-   stepper.setSpeed(200);
 }
 
 void loop()
 {  
-   stepper.runSpeed();
+  stepper.move(400);
+  stepper.setSpeed(400);
+  stepper.runSpeedToPosition();
 }

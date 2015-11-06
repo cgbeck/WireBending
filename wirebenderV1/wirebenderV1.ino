@@ -1,98 +1,115 @@
 // Includes ////////////////////////////////////////////////////////////////////////////
-#include <Wire.h>
 #include <LiquidCrystal.h>
-#include <Adafruit_MotorShield.h>
-#include "utility/Adafruit_PWMServoDriver.h"
+#include <AccelStepper.h>
 
 // Motor Definitions ///////////////////////////////////////////////////////////////////
-Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
-Adafruit_StepperMotor *feedMotorOne = AFMS.getStepper(200, 1);
-Adafruit_StepperMotor *feedMotorTwo = AFMS.getStepper(200, 2);
-Adafruit_StepperMotor *feedMotorThree = AFMS.getStepper(200, 2);
+AccelStepper stepper(1, 8, 9);
 
 // Structs /////////////////////////////////////////////////////////////////////////////
-typedef struct button{
-  int prevBtnState;
-  int btnState;
-  const int pin;
-};
+//typedef struct button{
+//  int prevBtnState;
+//  int btnState;
+//  const int pin;
+//};
 
-// Global Definitions //////////////////////////////////////////////////////////////////
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-const int potentiometerPin = A0;
-const int upprBtnPin = A1;
+// CONSTANTS 
+LiquidCrystal lcd(12, 11, 5, 4, 3, 6);
+const float ROLLER_DIAMETER = 26; // in mm
+const int STEPS_PER_ROTATION = 200;
+const int POT_PIN = A0;
+const int BUTTON_PIN = 2;
+const byte NUM_READINGS = 20;
+const long DEBOUNCE_DELAY = 400;  // amount of debounce delay (ms)
 
-// Roller Size Calculations ////////////////////////////////////////////////////////////
-byte pi = 3.14159;
-byte rollerRadius;
-int rollerCirc = 2*pi*rollerRadius;
-
-// Motor Power Definitions /////////////////////////////////////////////////////////////
-byte fullpower = 255;
-byte m1Power;
-byte m2Power;
-byte m3Power;
-int pVal;
-
-// Bender Position /////////////////////////////////////////////////////////////////////
+// Bender Position 
 int curLength = 0;
 int curTheta = 0;
 int curPhi = 0;
 
-// Object Bend Array Definitions ///////////////////////////////////////////////////////
+// Object Bend Array Definitions
 int lengths [0];
 int thetaVals [0];
 int phiVals [0];
 
-// Debounce Stuff //////////////////////////////////////////////////////////////////////
-long debounceDelay = 50;
-long prevDebounceTime = 0;
+// Boxcar Average
+int readings[NUM_READINGS];
+int readIndex = 0;
+int total = 0;
+int average = 0;
+int lastAverage = 0;
 
-// Setup ///////////////////////////////////////////////////////////////////////////////
+// Other variables
+int feedLength;
+const byte EN = 10;
+long lastDebounceTime;
+
+// Setup
 void setup() {
   Serial.begin(9600); // set up Serial library at 9600 bps
-  AFMS.begin(); // create with the default frequency 1.6KHz
-//  attachInterrupt(digitalPinToInterrupt(buttonPin), chooseLength, RISING);
   
-  pinMode(potentiometerPin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), debounce, RISING);
+  pinMode(POT_PIN, INPUT);
   
-  feedMotorOne->setSpeed(0);
-  feedMotorTwo->setSpeed(0);
-  feedMotorThree->setSpeed(0);
+  stepper.setMaxSpeed(1000);
+
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("FEED LENGTH: ");
+
+  feedLength = 100;
 }
 
-// Main Loop ///////////////////////////////////////////////////////////////////////////
+// Main Loop
 void loop() {
-  feedSpeedUpdate();
-  feedMotorOne->setSpeed(m1Power);
+  if (stepper.distanceToGo() != 0) {
+    stepper.runSpeedToPosition();
+  } else {
+    int potReading = analogRead(POT_PIN);
   
-//  if(/*done*/){
-//     //cut wire
+    total -= readings[readIndex];
+    readings[readIndex] = potReading;
+    total += readings[readIndex];
+    readIndex++;
+    if(readIndex >= NUM_READINGS) {
+      readIndex = 0;
+    }
+    lastAverage = average;
+    average = total/NUM_READINGS;
+  
+    if (abs(average/12 - feedLength) > 0.5) {
+      feedLength = average/12;
+      lcd.setCursor(0, 1); // Set the cursor to the next row
+      if (feedLength < 10) {
+        lcd.print(0);
+      }
+      lcd.print(feedLength);
+      lcd.print("mm");
+    }
+  }
+  Serial.println(stepper.distanceToGo());
+  
+//  if(done){
+//     cut wire
 //  }
   
 }
 
-// Feed Speed Update Function //////////////////////////////////////////////////////////
-void feedSpeedUpdate(){
-  pVal = analogRead(potentiometerPin);
-  m1Power = pVal/4; // convert the value from the potentiometer to some value between the min and max of the motor speed\
-  lcdPrint("Feed Power: ",m1Power);
-}
-
-void bend(){
-  int i = 0;
-  while(/*length(int bends < i*/true){
-     break;
+/* 
+ *  debouncing code (called by interrupt)
+ *  toggles whether or not the scan is running
+ */
+void debounce(){
+  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY) {
+    // set a new position for the stepper
+    stepper.move(mmToSteps(feedLength));
+    stepper.setSpeed(300);
+    
+    // update last debounce time
+    lastDebounceTime = millis();
   }
 }
 
-void lcdPrint(const char* string, int value){
-  if ((millis() - prevDebounceTime) > debounceDelay){
-     lcd.begin(16, 2);
-    lcd.clear();
-    lcd.print(string);
-    lcd.print(value);
-  }
+int mmToSteps(int mm) {
+  return STEPS_PER_ROTATION*mm/(ROLLER_DIAMETER*PI);
 }
-//
 
