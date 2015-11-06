@@ -49,6 +49,7 @@ void setup() {
   
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), debounce, RISING);
   pinMode(POT_PIN, INPUT);
+  pinMode(EN, OUTPUT);
   
   stepper.setMaxSpeed(1000);
 
@@ -64,6 +65,7 @@ void loop() {
   if (stepper.distanceToGo() != 0) {
     stepper.runSpeedToPosition();
   } else {
+    digitalWrite(EN, HIGH);
     int potReading = analogRead(POT_PIN);
   
     total -= readings[readIndex];
@@ -103,6 +105,7 @@ void debounce(){
     // set a new position for the stepper
     stepper.move(mmToSteps(feedLength));
     stepper.setSpeed(300);
+    digitalWrite(EN, LOW);
     
     // update last debounce time
     lastDebounceTime = millis();
