@@ -35,7 +35,6 @@ byte writeActionIndex;
 byte runState;
 long prevFeedDist;
 long prevBendDist;
-int numReceived;
 
 // Setup
 void setup() {
@@ -67,7 +66,6 @@ void setup() {
 
   prevFeedDist = 0;
   prevBendDist = 0;
-  numReceived = 0;
 
   runState = STATE_READY;
 
@@ -81,7 +79,8 @@ void loop() {
   if (runState == STATE_READY) {  // wait for START messaage
     if (Serial.available() > 0) {
       String input = Serial.readString();
-      if (input = "START") {
+      if (input == "START") {
+        Serial.println(input);
         // REINITIALIZE VARIABLES SOMEWHERE
         runState = STATE_INIT;
         Serial.setTimeout(500);
@@ -112,6 +111,7 @@ void loop() {
     // perform another action in the queue if current action is finished
     checkActionCompleted();
   } else if (runState = STATE_END) {
+    
     // move the motors
     moveMotors();
 
@@ -125,7 +125,6 @@ void loop() {
       runState = STATE_READY;
       currentActionIndex = 0;
       writeActionIndex = 0;
-      numReceived = 0;
       prevFeedDist = 0;
       prevBendDist = 0;
       feedStepper.disableOutputs();
@@ -205,7 +204,6 @@ bool moveMotors() {
   if (prevBendDist != 0) {
     bendStepper.run();
     moved = true;
-//    Serial.println(prevBendDist);
   }
   return moved;
 }
@@ -255,10 +253,8 @@ bool initAction() {
       Serial.println("mm");
 
       feedStepper.move(-mmToStepsFeed(queue[currentActionIndex].actionAmount));
-      feedStepper.setSpeed(300);
       feedStepper.enableOutputs();
-      delay(100); // TODO: FIX THE DELAYS TO BE NON-BLOCKING
-//      receiveCommand();
+      delay(100);
       return true;
     } else if (queue[currentActionIndex].action == ACTION_BEND) {
       Serial.print("bending ");
@@ -266,15 +262,8 @@ bool initAction() {
       Serial.println("deg");
 
       bendStepper.move(degToStepsBend(queue[currentActionIndex].actionAmount));
-      Serial.println(degToStepsBend(queue[currentActionIndex].actionAmount));
-      // TODO:FIX BROKEN NEGATIVE BENDING
-
-
-      
-      bendStepper.setSpeed(300);
       bendStepper.enableOutputs();
       delay(100);
-//      receiveCommand();
       return true;
     }
   }
