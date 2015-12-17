@@ -35,6 +35,8 @@ byte writeActionIndex;
 byte runState;
 long prevFeedDist;
 long prevBendDist;
+unsigned long completeTime;
+byte completeFlash;
 
 // Setup
 void setup() {
@@ -68,32 +70,52 @@ void setup() {
   prevBendDist = 0;
 
   runState = STATE_READY;
+  completeFlash = 0;
+  completeTime = millis() - 6000;
 
   lcd.begin(16, 2);
-  lcd.setCursor(0, 0);
+  lcd.clear();
   lcd.print("READY");
 }
 
 // Main Loop
 void loop() {
   if (runState == STATE_READY) {  // wait for START messaage
+    if (millis() - completeTime < 5995) {
+      if ((millis() - completeTime)%1090 < 545 && completeFlash == 0) {
+        lcd.print("COMPLETE");
+        completeFlash = 1;
+      } else if ((millis() - completeTime)%1090 > 545 && completeFlash == 1) {
+        lcd.clear();
+        completeFlash = 0;
+      }
+    } else {
+      if (completeFlash == 1) {
+        lcd.clear();
+        lcd.print("READY");
+        completeFlash = 0;
+      }
+    }
+    
     if (Serial.available() > 0) {
       String input = Serial.readString();
       if (input == "START") {
         Serial.println(input);
-        // REINITIALIZE VARIABLES SOMEWHERE
+        lcd.clear();
+        lcd.print("INITIALIZING");
         runState = STATE_INIT;
-        Serial.setTimeout(500);
-        Serial.println("SEND_COMMAND STATE_INIT");
+        Serial.setTimeout(200);
+        Serial.println("SEND_COMMAND");
       }
     }
   } else if (runState == STATE_INIT) {  // fill the queue first
     if (receiveCommand()) {
       if (runState == STATE_INIT) {
         if (writeActionIndex != 0) {  // queue is not filled yet
-          Serial.println("SEND_COMMAND STATE_INIT");
+          Serial.println("SEND_COMMAND");
         } else {  // queue is full
           Serial.println("queue full");
+          initAction();
           runState = STATE_RUNNING;
         }
       } else if (runState == STATE_END) {
@@ -122,6 +144,8 @@ void loop() {
     if (queue[currentActionIndex].action == ACTION_NONE) {
       Serial.println("COMPLETE");
       Serial.setTimeout(1000);
+      lcd.clear();
+      completeTime = millis();
       runState = STATE_READY;
       currentActionIndex = 0;
       writeActionIndex = 0;
@@ -252,6 +276,29 @@ bool initAction() {
       Serial.print(queue[currentActionIndex].actionAmount);
       Serial.println("mm");
 
+      lcd.clear();
+      lcd.print("FEEDING ");
+      lcd.print(queue[currentActionIndex].actionAmount);
+      lcd.print("mm");
+      lcd.setCursor(0, 1);
+      lcd.print((char)0x7e);
+      ActionItem nextItem = queue[incrementQueueIndex(currentActionIndex)];
+      if (nextItem.action == ACTION_BEND) {
+        lcd.print("BEND ");
+        lcd.print(nextItem.actionAmount);
+        lcd.print((char)0xdf);
+      } else if (nextItem.action == ACTION_FEED) {
+        lcd.print("FEED ");
+        lcd.print(nextItem.actionAmount);
+        lcd.print("mm");
+      } else if (nextItem.action == ACTION_NONE && runState == STATE_RUNNING) {
+        lcd.print("WAIT FOR NEXT");
+        lcd.print(nextItem.actionAmount);
+        lcd.print("mm");
+      } else if (nextItem.action == ACTION_NONE && runState == STATE_END) {
+        lcd.print("END");
+      }
+
       feedStepper.move(-mmToStepsFeed(queue[currentActionIndex].actionAmount));
       feedStepper.enableOutputs();
       delay(100);
@@ -260,6 +307,29 @@ bool initAction() {
       Serial.print("bending ");
       Serial.print(queue[currentActionIndex].actionAmount);
       Serial.println("deg");
+
+      lcd.clear();
+      lcd.print("BENDING ");
+      lcd.print(queue[currentActionIndex].actionAmount);
+      lcd.print((char)0xdf);
+      lcd.setCursor(0, 1);
+      lcd.print((char)0x7e);
+      ActionItem nextItem = queue[incrementQueueIndex(currentActionIndex)];
+      if (nextItem.action == ACTION_BEND) {
+        lcd.print("BEND ");
+        lcd.print(nextItem.actionAmount);
+        lcd.print((char)0xdf);
+      } else if (nextItem.action == ACTION_FEED) {
+        lcd.print("FEED ");
+        lcd.print(nextItem.actionAmount);
+        lcd.print("mm");
+      } else if (nextItem.action == ACTION_NONE && runState == STATE_RUNNING) {
+        lcd.print("WAIT FOR NEXT");
+        lcd.print(nextItem.actionAmount);
+        lcd.print("mm");
+      } else if (nextItem.action == ACTION_NONE && runState == STATE_END) {
+        lcd.print("END");
+      }
 
       bendStepper.move(degToStepsBend(queue[currentActionIndex].actionAmount));
       bendStepper.enableOutputs();
