@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 #######################################################################
 # Includes but since this is python, imports
 #######################################################################
@@ -96,7 +98,7 @@ class benderApp(Frame):
 		feedBtn.place(x=220,y=265)
 
 		sendBtn = tkinter.Button(self, text="Send", 
-			width=20, fg="white", bg="black", 
+			width=20, fg="white", bg="black", relief="flat",
 			command=lambda: self.sendList())
 		sendBtn.place(x=135,y=350)
 
@@ -135,13 +137,13 @@ class benderApp(Frame):
 
 	def updatePort(self):
 		self.ser= serial.Serial(baudrate = 9600)
-		self.ser.port = self.portNum.get()
+		# self.ser.port = self.portNum.get()
+		self.ser.port = "/dev/cu.usbmodem1411"
 		self.ser.open()
 
 	def writeAngle(self,value):
 		listCommands.insert(-1,'BEND '+str(value))
 		self.printCommands()
-		listCommands.insert(-1,'BEND '+str(value*-1))
 		
 	def writeLength(self,value):
 		listCommands.insert(-1,'FEED '+ str(value))
